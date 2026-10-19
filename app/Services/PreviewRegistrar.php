@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\SectionList;
 use Illuminate\Support\Str;
 
 /**
@@ -41,6 +42,16 @@ class PreviewRegistrar
 
         return collect($this->previews())
             ->first(fn ($preview) => strtolower((string) ($preview['environment']['attributes']['vanity_domain'] ?? '')) === $host);
+    }
+
+    /**
+     * The sections configured on the landing page for the preview's app.
+     *
+     * @return list<string>
+     */
+    public function sections(array $preview): array
+    {
+        return SectionList::for($preview['application']['id']);
     }
 
     /**

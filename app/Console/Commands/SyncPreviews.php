@@ -15,18 +15,16 @@ class SyncPreviews extends Command
     /**
      * A safety net for the deploy-time registration: previews that never
      * called in (or called before their vanity domain existed) still get
-     * the ROUTER_SECTIONS domains, and pending domains are re-verified.
+     * their application's sections, and pending domains are re-verified.
      */
     public function handle(PreviewRegistrar $registrar): int
     {
-        $sections = config('router.sections');
-
         foreach ($registrar->previews() as $preview) {
             $environment = $preview['environment'];
             $label = $environment['attributes']['name'] ?? $environment['id'];
 
             try {
-                if ($sections) {
+                if ($sections = $registrar->sections($preview)) {
                     $created = collect($registrar->register($environment, $sections))->where('created', true);
 
                     $created->each(fn ($domain) => $this->info("{$label}: added {$domain['hostname']}"));

@@ -21,9 +21,7 @@
         <env name="APP_ENV" value="testing"/>
         <env name="CLOUD_API_TOKEN" value="test-token"/>
         <env name="ROUTER_TOKEN" value="router-secret"/>
-        <env name="ROUTER_PASSWORD" value="dash-secret"/>
         <env name="ROUTER_ROOT_DOMAIN" value="laravel-demo.cloud"/>
-        <env name="ROUTER_SECTIONS" value="admin,booking"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

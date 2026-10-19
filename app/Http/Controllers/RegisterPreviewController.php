@@ -11,21 +11,13 @@ class RegisterPreviewController extends Controller
 {
     /**
      * Called by a preview environment (from its deploy command) to get a
-     * custom domain for each of its sections.
+     * custom domain for each section configured for its application.
      */
     public function __invoke(Request $request, PreviewRegistrar $registrar): JsonResponse
     {
         $validated = $request->validate([
             'app_url' => ['required', 'string', 'max:255'],
-            'sections' => ['nullable', 'array', 'max:'.config('router.max_sections')],
-            'sections.*' => ['string', 'max:63', 'regex:/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/i'],
         ]);
-
-        $sections = $validated['sections'] ?? config('router.sections');
-
-        if (empty($sections)) {
-            return response()->json(['message' => 'No sections sent and ROUTER_SECTIONS is empty.'], 422);
-        }
 
         try {
             $preview = $registrar->findByUrl($validated['app_url']);
@@ -34,6 +26,14 @@ class RegisterPreviewController extends Controller
                 return response()->json([
                     'message' => "No preview environment has the vanity domain for {$validated['app_url']}.",
                 ], 404);
+            }
+
+            $application = $preview['application']['attributes']['name'] ?? $preview['application']['id'];
+
+            if (! $sections = $registrar->sections($preview)) {
+                return response()->json([
+                    'message' => "No sections are configured for {$application} on the router.",
+                ], 422);
             }
 
             $domains = $registrar->register($preview['environment'], $sections);
@@ -45,7 +45,7 @@ class RegisterPreviewController extends Controller
         }
 
         return response()->json([
-            'application' => $preview['application']['attributes']['name'] ?? $preview['application']['id'],
+            'application' => $application,
             'environment' => $preview['environment']['id'],
             'slug' => $registrar->slug($preview['environment']),
             'domains' => $domains,

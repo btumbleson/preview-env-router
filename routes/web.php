@@ -1,9 +1,10 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
-use App\Http\Middleware\RequireDashboardPassword;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', DashboardController::class)
-    ->middleware(RequireDashboardPassword::class)
-    ->name('dashboard');
+// Protect this environment with Cloud's HTTP basic auth.
+Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+Route::put('/applications/{application}/sections', [DashboardController::class, 'updateSections'])
+    ->name('sections.update');

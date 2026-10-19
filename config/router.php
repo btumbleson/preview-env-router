@@ -22,14 +22,13 @@ return [
     | Access
     |--------------------------------------------------------------------------
     |
-    | "token" is the shared secret apps send (as a bearer token) when they
-    | register a preview. "password" protects the status page.
+    | The shared secret previews send in the X-Router-Token header when they
+    | register. The landing page itself is meant to sit behind Cloud's HTTP
+    | basic auth, which uses the Authorization header, hence a custom one.
     |
     */
 
     'token' => env('ROUTER_TOKEN'),
-
-    'password' => env('ROUTER_PASSWORD'),
 
     /*
     |--------------------------------------------------------------------------
@@ -40,14 +39,12 @@ return [
     | DNS-only "*.{root_domain}" CNAME to Cloud's origin, and the slug must
     | not match an existing record, which would block that wildcard.
     |
-    | "sections" are used by the scheduled sync for previews that haven't
-    | registered themselves; an app's own request may send its list instead.
+    | The sections each application's previews get are edited on the landing
+    | page and stored in the database.
     |
     */
 
     'root_domain' => env('ROUTER_ROOT_DOMAIN', 'laravel-demo.cloud'),
-
-    'sections' => array_values(array_filter(explode(',', (string) env('ROUTER_SECTIONS', '')))),
 
     'max_sections' => 10,
 
