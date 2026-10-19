@@ -46,8 +46,8 @@
 
     <div class="box">
         <h2>Trigger a sync when a preview is created</h2>
-        <p class="muted">Add this to the preview automation's <strong>Initial deploy commands</strong> in Cloud, with this environment's basic auth credentials:</p>
-        <pre style="white-space: pre-wrap; word-break: break-all; margin: 0 0 12px"><code>curl -fsS -X POST -u 'admin:PASSWORD' {{ route('api.sync') }} || true</code></pre>
+        <p class="muted">Add this to the preview automation's <strong>Initial deploy commands</strong> in Cloud:</p>
+        <pre style="white-space: pre-wrap; word-break: break-all; margin: 0 0 12px"><code>curl -fsS -X POST {{ route('api.sync') }} || true</code></pre>
         <form method="POST" action="{{ route('sync') }}">
             @csrf
             <button type="submit">Sync now</button>

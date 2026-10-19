@@ -175,7 +175,7 @@ class RouterTest extends TestCase
     {
         $this->fakeCloud();
 
-        $this->get('/')->assertOk()->assertSee("curl -fsS -X POST -u 'admin:PASSWORD' ".route('api.sync').' || true', false);
+        $this->get('/')->assertOk()->assertSee('curl -fsS -X POST '.route('api.sync').' || true', false);
     }
 
     public function test_sync_now_button_runs_a_sync(): void
