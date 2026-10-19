@@ -39,15 +39,21 @@
 <main>
     <h1>Preview Router</h1>
     <p>
-        Choose the subdomain sections each application's previews get. The router checks Cloud every
-        minute for preview environments and adds <code>{section}.{slug}.{{ config('router.root_domain') }}</code>
-        for each section. The apps themselves need no changes.
+        Choose the subdomain sections each application's previews get. A sync gives every preview
+        environment <code>{section}.{slug}.{{ config('router.root_domain') }}</code> for each section,
+        skipping domains it already has. The apps themselves need no changes.
     </p>
 
-    <form method="POST" action="{{ route('sync') }}" style="margin-bottom: 24px">
-        @csrf
-        <button type="submit">Sync now</button>
-    </form>
+    <div class="box">
+        <h2>Trigger a sync when a preview is created</h2>
+        <p class="muted">Add this to the preview automation's <strong>Initial deploy commands</strong> in Cloud, with this environment's basic auth credentials:</p>
+        <pre style="white-space: pre-wrap; word-break: break-all; margin: 0 0 12px"><code>curl -fsS -X POST -u 'admin:PASSWORD' {{ route('api.sync') }} || true</code></pre>
+        <form method="POST" action="{{ route('sync') }}">
+            @csrf
+            <button type="submit">Sync now</button>
+            <span class="muted">Runs the same sync, e.g. after changing sections.</span>
+        </form>
+    </div>
 
     @if (session('status'))
         <div class="flash">{{ session('status') }}</div>

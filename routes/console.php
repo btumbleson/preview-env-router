@@ -1,10 +1,4 @@
 <?php
 
-use Illuminate\Support\Facades\Schedule;
-
-// How the router finds new previews: there's no hook from Cloud, so poll.
-// Requires the scheduler to be enabled on the router's Cloud environment.
-Schedule::command('previews:sync')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->when(fn () => filled(config('router.cloud.token')));
+// previews:sync isn't scheduled: previews trigger it via POST /api/sync from
+// their initial deploy commands, and the landing page has a "Sync now" button.

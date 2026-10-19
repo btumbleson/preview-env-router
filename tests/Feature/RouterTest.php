@@ -146,12 +146,36 @@ class RouterTest extends TestCase
         Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'env-prod'));
     }
 
-    public function test_sync_is_scheduled_every_minute(): void
+    public function test_sync_is_not_scheduled(): void
     {
-        $event = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
-            ->first(fn ($event) => str_contains($event->command, 'previews:sync'));
+        $this->assertEmpty(app(\Illuminate\Console\Scheduling\Schedule::class)->events());
+    }
 
-        $this->assertSame('* * * * *', $event?->expression);
+    public function test_curl_can_trigger_a_sync_without_a_csrf_token(): void
+    {
+        $this->fakeCloud();
+        $this->sections(['admin', 'internal']);
+
+        $this->withMiddleware()
+            ->call('POST', '/api/sync', server: ['HTTP_ACCEPT' => '*/*'])
+            ->assertOk()
+            ->assertExactJson([
+                'previews' => 1,
+                'added' => [
+                    'admin.feat-internal-subdomain.laravel-demo.cloud',
+                    'internal.feat-internal-subdomain.laravel-demo.cloud',
+                ],
+                'errors' => [],
+            ]);
+
+        $this->postJson('/api/sync')->assertOk()->assertJsonPath('added', []);
+    }
+
+    public function test_landing_page_shows_the_curl_command(): void
+    {
+        $this->fakeCloud();
+
+        $this->get('/')->assertOk()->assertSee("curl -fsS -X POST -u 'admin:PASSWORD' ".route('api.sync').' || true', false);
     }
 
     public function test_sync_now_button_runs_a_sync(): void

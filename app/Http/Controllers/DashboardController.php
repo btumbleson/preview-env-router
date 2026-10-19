@@ -6,6 +6,7 @@ use App\Models\SectionList;
 use App\Services\CloudApi;
 use App\Services\PreviewRegistrar;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -44,6 +45,22 @@ class DashboardController extends Controller
         return view('dashboard', ['applications' => $applications, 'error' => null]);
     }
 
+    /**
+     * The same sync for curl: called from a preview automation's initial
+     * deploy commands, so a new preview gets its domains as it deploys.
+     */
+    public function syncApi(PreviewRegistrar $registrar): JsonResponse
+    {
+        $results = $registrar->sync();
+
+        return response()->json([
+            'previews' => count($results),
+            'added' => collect($results)->flatMap(fn ($result) => $result['added'])->values(),
+            'errors' => collect($results)->filter(fn ($result) => $result['error'])
+                ->map(fn ($result) => "{$result['preview']}: {$result['error']}")->values(),
+        ]);
+    }
+
     public function sync(PreviewRegistrar $registrar): RedirectResponse
     {
         $results = collect($registrar->sync());
@@ -79,6 +96,6 @@ class DashboardController extends Controller
             ['application_name' => $request->input('application_name'), 'sections' => $sections],
         );
 
-        return to_route('dashboard')->with('status', 'Sections saved. Previews get them on the next sync, within a minute.');
+        return to_route('dashboard')->with('status', 'Sections saved. New previews get them when they deploy; use Sync now for existing ones.');
     }
 }
