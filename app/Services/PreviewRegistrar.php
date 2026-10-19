@@ -4,9 +4,12 @@ namespace App\Services;
 
 use App\Models\SectionList;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
- * Gives a preview environment "{section}.{slug}.{root}" custom domains.
+ * Gives preview environments "{section}.{slug}.{root}" custom domains, using
+ * only the Cloud API: previews are discovered by polling, so the app being
+ * previewed needs no knowledge of the router.
  */
 class PreviewRegistrar
 {
@@ -30,18 +33,6 @@ class PreviewRegistrar
         }
 
         return $previews;
-    }
-
-    /**
-     * The preview environment served at the given URL, matched on its vanity
-     * domain (Cloud sets APP_URL to it on every deployment).
-     */
-    public function findByUrl(string $url): ?array
-    {
-        $host = strtolower(parse_url($url, PHP_URL_HOST) ?: $url);
-
-        return collect($this->previews())
-            ->first(fn ($preview) => strtolower((string) ($preview['environment']['attributes']['vanity_domain'] ?? '')) === $host);
     }
 
     /**
@@ -91,7 +82,7 @@ class PreviewRegistrar
 
     /**
      * Ensure each section has a custom domain on the environment. Existing
-     * domains are left alone, so this is safe to run on every deployment.
+     * domains are left alone, so this is safe to run repeatedly.
      *
      * @return list<array{hostname: string, id: ?string, created: bool, hostname_status: mixed, ssl_status: mixed, origin_status: mixed}>
      */
@@ -118,6 +109,43 @@ class PreviewRegistrar
                     'origin_status' => $domain['attributes']['origin_status'] ?? 'pending',
                 ];
             })
+            ->all();
+    }
+
+    /**
+     * Bring every preview environment in line with its application's
+     * sections, and nudge domains that are still verifying.
+     *
+     * @return list<array{preview: string, added: list<string>, pending: int, error: ?string}>
+     */
+    public function sync(): array
+    {
+        return collect($this->previews())
+            ->map(function ($preview) {
+                $environment = $preview['environment'];
+                $result = [
+                    'preview' => $environment['attributes']['name'] ?? $environment['id'],
+                    'added' => [],
+                    'pending' => 0,
+                    'error' => null,
+                ];
+
+                try {
+                    if ($sections = $this->sections($preview)) {
+                        $result['added'] = collect($this->register($environment, $sections))
+                            ->where('created', true)
+                            ->pluck('hostname')
+                            ->all();
+                    }
+
+                    $result['pending'] = $this->nudge($environment);
+                } catch (Throwable $e) {
+                    $result['error'] = $e->getMessage();
+                }
+
+                return $result;
+            })
+            ->values()
             ->all();
     }
 

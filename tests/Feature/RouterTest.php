@@ -85,35 +85,18 @@ class RouterTest extends TestCase
         SectionList::create(['application_id' => 'app-1', 'application_name' => 'subdomain-test', 'sections' => $sections]);
     }
 
-    protected function register(array $payload, string $token = 'router-secret')
-    {
-        return $this->postJson('/api/previews', $payload, ['X-Router-Token' => $token]);
-    }
-
-    public function test_register_requires_the_router_token(): void
-    {
-        $this->register(['app_url' => 'https://'.self::VANITY], 'wrong')->assertUnauthorized();
-        $this->postJson('/api/previews', ['app_url' => 'https://'.self::VANITY])->assertUnauthorized();
-
-        // Basic auth credentials for Cloud's edge don't count as the token.
-        $this->postJson('/api/previews', ['app_url' => 'https://'.self::VANITY], ['Authorization' => 'Bearer router-secret'])
-            ->assertUnauthorized();
-    }
-
-    public function test_register_adds_a_domain_per_configured_section_for_the_matching_preview(): void
+    public function test_sync_adds_a_domain_per_configured_section_to_each_preview(): void
     {
         $this->fakeCloud();
         $this->sections(['admin', 'internal']);
 
-        $this->register(['app_url' => 'https://'.self::VANITY])
-            ->assertOk()
-            ->assertJsonPath('environment', 'env-preview')
-            ->assertJsonPath('slug', 'feat-internal-subdomain')
-            ->assertJsonPath('domains.0.hostname', 'admin.feat-internal-subdomain.laravel-demo.cloud')
-            ->assertJsonPath('domains.0.created', true)
-            ->assertJsonPath('domains.1.hostname', 'internal.feat-internal-subdomain.laravel-demo.cloud');
+        $this->artisan('previews:sync')
+            ->expectsOutputToContain('added admin.feat-internal-subdomain.laravel-demo.cloud')
+            ->expectsOutputToContain('added internal.feat-internal-subdomain.laravel-demo.cloud')
+            ->assertSuccessful();
 
         Http::assertSent(fn (Request $request) => $request->method() === 'POST'
+            && str_ends_with($request->url(), '/domains')
             && $request['name'] === 'internal.feat-internal-subdomain.laravel-demo.cloud'
             && $request['wildcard_enabled'] === false
             && $request['cloudflare_strategy'] === 'dns'
@@ -121,48 +104,64 @@ class RouterTest extends TestCase
             && str_contains($request->url(), '/environments/env-preview/domains'));
     }
 
-    public function test_register_is_idempotent(): void
+    public function test_sync_is_idempotent(): void
     {
         $this->fakeCloud();
         $this->sections(['admin']);
-        $payload = ['app_url' => 'https://'.self::VANITY];
 
-        $this->register($payload)->assertJsonPath('domains.0.created', true);
-        $this->register($payload)->assertJsonPath('domains.0.created', false);
+        $this->artisan('previews:sync')->expectsOutputToContain('added admin.')->assertSuccessful();
+        $this->artisan('previews:sync')->doesntExpectOutputToContain('added')->assertSuccessful();
 
         $this->assertCount(1, $this->domains['env-preview']);
     }
 
-    public function test_register_finds_the_domain_when_cloud_returns_no_body(): void
+    public function test_sync_handles_cloud_returning_no_body_on_create(): void
     {
         $this->fakeCloud(createdBody: null);
         $this->sections(['admin']);
 
-        $this->register(['app_url' => 'https://'.self::VANITY])
-            ->assertOk()
-            ->assertJsonPath('domains.0.id', 'dom-'.md5('admin.feat-internal-subdomain.laravel-demo.cloud'));
+        $this->artisan('previews:sync')->expectsOutputToContain('added admin.')->assertSuccessful();
+
+        $this->assertCount(1, $this->domains['env-preview']);
     }
 
-    public function test_register_explains_when_no_sections_are_configured(): void
+    public function test_sync_adds_nothing_without_configured_sections(): void
     {
         $this->fakeCloud();
 
-        $this->register(['app_url' => 'https://'.self::VANITY])
-            ->assertUnprocessable()
-            ->assertJsonPath('message', 'No sections are configured for subdomain-test on the router.');
+        $this->artisan('previews:sync')->doesntExpectOutputToContain('added')->assertSuccessful();
 
-        Http::assertNotSent(fn (Request $request) => $request->method() === 'POST');
+        Http::assertNotSent(fn (Request $request) => $request->method() === 'POST'
+            && str_ends_with($request->url(), '/domains'));
     }
 
-    public function test_register_never_touches_non_preview_environments(): void
+    public function test_sync_never_touches_non_preview_environments(): void
     {
         $this->fakeCloud();
         $this->sections(['admin']);
 
-        $this->register(['app_url' => 'https://subdomain-test.laravel-demo.cloud'])
-            ->assertNotFound();
+        $this->artisan('previews:sync')->assertSuccessful();
 
-        Http::assertNotSent(fn (Request $request) => $request->method() === 'POST');
+        $this->assertSame([], $this->domains['env-prod']);
+        Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'env-prod'));
+    }
+
+    public function test_sync_is_scheduled_every_minute(): void
+    {
+        $event = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
+            ->first(fn ($event) => str_contains($event->command, 'previews:sync'));
+
+        $this->assertSame('* * * * *', $event?->expression);
+    }
+
+    public function test_sync_now_button_runs_a_sync(): void
+    {
+        $this->fakeCloud();
+        $this->sections(['admin']);
+
+        $this->post('/sync')
+            ->assertRedirect('/')
+            ->assertSessionHas('status', 'Synced 1 preview(s). Added admin.feat-internal-subdomain.laravel-demo.cloud.');
     }
 
     public function test_slug_never_reuses_the_vanity_label(): void
@@ -174,17 +173,15 @@ class RouterTest extends TestCase
         $this->assertLessThanOrEqual(40, strlen($registrar->slug($this->environment('e', true, str_repeat('long-', 20), 'x.laravel-demo.cloud'))));
     }
 
-    public function test_sync_registers_configured_sections_and_nudges_pending_domains(): void
+    public function test_sync_nudges_pending_domains(): void
     {
         $this->fakeCloud();
         $this->sections(['admin', 'booking']);
 
         $this->artisan('previews:sync')
-            ->expectsOutputToContain('added admin.feat-internal-subdomain.laravel-demo.cloud')
             ->expectsOutputToContain('re-verifying 2 pending domain(s)')
             ->assertSuccessful();
 
-        $this->assertSame([], $this->domains['env-prod']);
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/verify'));
     }
 

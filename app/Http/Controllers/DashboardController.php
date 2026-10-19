@@ -44,6 +44,20 @@ class DashboardController extends Controller
         return view('dashboard', ['applications' => $applications, 'error' => null]);
     }
 
+    public function sync(PreviewRegistrar $registrar): RedirectResponse
+    {
+        $results = collect($registrar->sync());
+        $added = $results->flatMap(fn ($result) => $result['added']);
+        $errors = $results->filter(fn ($result) => $result['error'])
+            ->map(fn ($result) => "{$result['preview']}: {$result['error']}");
+
+        return to_route('dashboard')
+            ->with('status', $added->isEmpty()
+                ? "Synced {$results->count()} preview(s). Nothing new to add."
+                : "Synced {$results->count()} preview(s). Added {$added->implode(', ')}.")
+            ->with('sync_errors', $errors->values()->all());
+    }
+
     public function updateSections(Request $request, string $application): RedirectResponse
     {
         $request->validate([
@@ -65,6 +79,6 @@ class DashboardController extends Controller
             ['application_name' => $request->input('application_name'), 'sections' => $sections],
         );
 
-        return to_route('dashboard')->with('status', 'Sections saved. New and existing previews get them on their next registration or sync.');
+        return to_route('dashboard')->with('status', 'Sections saved. Previews get them on the next sync, within a minute.');
     }
 }

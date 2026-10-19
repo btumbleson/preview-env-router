@@ -39,14 +39,23 @@
 <main>
     <h1>Preview Router</h1>
     <p>
-        Choose the subdomain sections each application's previews get. A preview gets
-        <code>{section}.{slug}.{{ config('router.root_domain') }}</code> for each one, when it runs
-        <code>php artisan preview:register</code> on deploy or on the next scheduled sync.
+        Choose the subdomain sections each application's previews get. The router checks Cloud every
+        minute for preview environments and adds <code>{section}.{slug}.{{ config('router.root_domain') }}</code>
+        for each section. The apps themselves need no changes.
     </p>
+
+    <form method="POST" action="{{ route('sync') }}" style="margin-bottom: 24px">
+        @csrf
+        <button type="submit">Sync now</button>
+    </form>
 
     @if (session('status'))
         <div class="flash">{{ session('status') }}</div>
     @endif
+
+    @foreach (session('sync_errors', []) as $syncError)
+        <div class="flash error">{{ $syncError }}</div>
+    @endforeach
 
     @if ($error)
         <div class="flash error">{{ $error }}</div>

@@ -19,19 +19,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Access
-    |--------------------------------------------------------------------------
-    |
-    | The shared secret previews send in the X-Router-Token header when they
-    | register. The landing page itself is meant to sit behind Cloud's HTTP
-    | basic auth, which uses the Authorization header, hence a custom one.
-    |
-    */
-
-    'token' => env('ROUTER_TOKEN'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Hostnames
     |--------------------------------------------------------------------------
     |
