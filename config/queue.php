@@ -13,7 +13,8 @@ return [
     |
     */
 
-    'default' => env('QUEUE_CONNECTION', 'sync'),
+    // Pinned: the router queues nothing. Ignores an injected QUEUE_CONNECTION.
+    'default' => 'sync',
 
     /*
     |--------------------------------------------------------------------------

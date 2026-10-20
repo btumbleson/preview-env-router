@@ -15,7 +15,9 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'file'),
+    // Pinned: only rate limiting uses the cache, and a per-instance file
+    // store is fine for that. Ignores an injected CACHE_STORE=database.
+    'default' => 'file',
 
     /*
     |--------------------------------------------------------------------------

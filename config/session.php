@@ -18,7 +18,9 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'cookie'),
+    // Pinned: the router only needs a session for CSRF and flash messages, and
+    // Cloud injects SESSION_DRIVER=database when a database is attached.
+    'driver' => 'cookie',
 
     /*
     |--------------------------------------------------------------------------
