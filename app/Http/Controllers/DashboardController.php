@@ -20,21 +20,7 @@ class DashboardController extends Controller
     public function index(PreviewRegistrar $registrar, CloudApi $cloud): View
     {
         try {
-            $previews = collect($registrar->previews())->groupBy('application.id');
-
-            $applications = collect($cloud->applications())
-                ->map(fn ($application) => [
-                    'id' => $application['id'],
-                    'name' => $application['attributes']['name'] ?? $application['id'],
-                    'sections' => SectionList::for($application['id']),
-                    'previews' => $previews->get($application['id'], collect())
-                        ->map(fn ($preview) => $preview + [
-                            'slug' => $registrar->slug($preview['environment']),
-                            'domains' => $cloud->domains($preview['environment']['id']),
-                        ])
-                        ->all(),
-                ])
-                ->all();
+            $applications = $this->applications($registrar, $cloud);
         } catch (RequestException $e) {
             return view('dashboard', [
                 'applications' => [],
@@ -43,6 +29,44 @@ class DashboardController extends Controller
         }
 
         return view('dashboard', ['applications' => $applications, 'error' => null]);
+    }
+
+    /**
+     * Just the preview lists, polled by the landing page every few seconds.
+     * Domains still verifying get nudged, so their statuses keep moving.
+     */
+    public function previews(PreviewRegistrar $registrar, CloudApi $cloud): View
+    {
+        $applications = $this->applications($registrar, $cloud);
+
+        $domains = collect($applications)
+            ->flatMap(fn ($application) => $application['previews'])
+            ->flatMap(fn ($preview) => $preview['domains']);
+
+        foreach ($domains as $domain) {
+            $registrar->nudgeDomain($domain);
+        }
+
+        return view('previews-fragment', ['applications' => $applications]);
+    }
+
+    protected function applications(PreviewRegistrar $registrar, CloudApi $cloud): array
+    {
+        $previews = collect($registrar->previews())->groupBy('application.id');
+
+        return collect($cloud->applications())
+            ->map(fn ($application) => [
+                'id' => $application['id'],
+                'name' => $application['attributes']['name'] ?? $application['id'],
+                'sections' => SectionList::for($application['id']),
+                'previews' => $previews->get($application['id'], collect())
+                    ->map(fn ($preview) => $preview + [
+                        'slug' => $registrar->slug($preview['environment']),
+                        'domains' => $cloud->domains($preview['environment']['id']),
+                    ])
+                    ->all(),
+            ])
+            ->all();
     }
 
     /**

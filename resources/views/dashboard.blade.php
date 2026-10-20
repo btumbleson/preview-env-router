@@ -33,6 +33,7 @@
         .flash { padding: 12px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); margin-bottom: 16px; }
         .flash.error, .field-error { color: #dc2626; border-color: #dc2626; }
         .field-error { font-size: 14px; margin: 6px 0 0; }
+        .badge.live { background: #16a34a; border-color: #16a34a; color: #fff; }
     </style>
 </head>
 <body>
@@ -89,31 +90,10 @@
                 </p>
             </form>
 
-            <h3>Previews</h3>
-            @forelse ($application['previews'] as $preview)
-                <div style="margin-top: 12px">
-                    <strong>{{ Display::value($preview['environment']['attributes']['name'] ?? null) }}</strong>
-                    <p class="muted" style="margin: 0">
-                        Slug <code>{{ $preview['slug'] }}</code>
-                        · Vanity <code>{{ Display::value($preview['environment']['attributes']['vanity_domain'] ?? null) }}</code>
-                    </p>
-
-                    @forelse ($preview['domains'] as $domain)
-                        @php($name = Display::value($domain['attributes']['name'] ?? null))
-                        <div class="row">
-                            <a href="https://{{ $name }}">{{ $name }}</a>
-                            @foreach (['hostname_status', 'ssl_status', 'origin_status'] as $key)
-                                @php($status = Display::status($domain['attributes'][$key] ?? null))
-                                <span class="badge {{ $status }}">{{ str($key)->before('_') }}: {{ $status }}</span>
-                            @endforeach
-                        </div>
-                    @empty
-                        <p class="muted" style="margin: 0">No custom domains yet.</p>
-                    @endforelse
-                </div>
-            @empty
-                <p class="muted" style="margin: 0">No preview environments right now.</p>
-            @endforelse
+            <h3>Previews <span class="muted" data-updated style="font-weight: normal"></span></h3>
+            <div data-previews="{{ $application['id'] }}">
+                @include('partials.previews', ['previews' => $application['previews']])
+            </div>
         </section>
     @endforeach
 
@@ -121,5 +101,34 @@
         <p>The Cloud API token can't see any applications.</p>
     @endif
 </main>
+<script>
+    // Refresh preview statuses every 10 seconds while the tab is visible,
+    // without reloading the page (which would lose an in-progress edit).
+    (() => {
+        const refresh = async () => {
+            if (document.hidden) return;
+
+            try {
+                const response = await fetch(@json(route('previews')), { headers: { Accept: 'text/html' } });
+                if (! response.ok) return;
+
+                const html = new DOMParser().parseFromString(await response.text(), 'text/html');
+
+                html.querySelectorAll('[data-previews]').forEach((fresh) => {
+                    const current = document.querySelector(`[data-previews="${fresh.dataset.previews}"]`);
+                    if (current) current.innerHTML = fresh.innerHTML;
+                });
+
+                const time = new Date().toLocaleTimeString();
+                document.querySelectorAll('[data-updated]').forEach((el) => el.textContent = `· updated ${time}`);
+            } catch (e) {
+                // Keep showing the last good state; try again next tick.
+            }
+        };
+
+        setInterval(refresh, 10000);
+        document.addEventListener('visibilitychange', refresh);
+    })();
+</script>
 </body>
 </html>

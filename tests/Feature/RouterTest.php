@@ -224,6 +224,37 @@ class RouterTest extends TestCase
             ->assertDontSee('leaked');
     }
 
+    public function test_previews_fragment_refreshes_statuses_and_nudges_pending_domains_at_most_every_30_seconds(): void
+    {
+        $this->fakeCloud();
+        $this->domains['env-preview'][] = $this->domain('admin.feat-internal-subdomain.laravel-demo.cloud', 'verified');
+        $this->domains['env-preview'][] = $this->domain('internal.feat-internal-subdomain.laravel-demo.cloud');
+
+        $this->get('/previews')
+            ->assertOk()
+            ->assertSee('data-previews="app-1"', false)
+            ->assertSee('<span class="badge live">live</span>', false)
+            ->assertSee('internal.feat-internal-subdomain.laravel-demo.cloud')
+            ->assertDontSee('<form', false);
+
+        $this->get('/previews')->assertOk();
+
+        $verifies = collect(Http::recorded())->filter(fn ($pair) => str_ends_with($pair[0]->url(), '/verify'));
+        $this->assertCount(1, $verifies);
+        $this->assertStringContainsString('dom-'.md5('internal.feat-internal-subdomain.laravel-demo.cloud'), $verifies->first()[0]->url());
+    }
+
+    public function test_landing_page_polls_the_previews_fragment(): void
+    {
+        $this->fakeCloud();
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('data-previews="app-1"', false)
+            ->assertSee(json_encode(route('previews')), false)
+            ->assertSee('setInterval(refresh, 10000)', false);
+    }
+
     public function test_sections_can_be_saved_from_the_landing_page(): void
     {
         $this->put('/applications/app-1/sections', [

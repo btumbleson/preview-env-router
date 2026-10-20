@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\SectionList;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -155,13 +156,27 @@ class PreviewRegistrar
      */
     public function nudge(array $environment): int
     {
-        $pending = collect($this->cloud->domains($environment['id']))
-            ->reject(fn ($domain) => collect($domain['attributes'])
-                ->only(['hostname_status', 'ssl_status', 'origin_status'])
-                ->every(fn ($status) => $status === 'verified'));
+        return collect($this->cloud->domains($environment['id']))
+            ->filter(fn ($domain) => $this->nudgeDomain($domain))
+            ->count();
+    }
 
-        $pending->each(fn ($domain) => rescue(fn () => $this->cloud->verifyDomain($domain['id']), report: false));
+    /**
+     * Ask Cloud to re-check one domain if it isn't verified yet, at most once
+     * every 30 seconds however often this is called. Returns whether it did.
+     */
+    public function nudgeDomain(array $domain): bool
+    {
+        $verified = collect($domain['attributes'] ?? [])
+            ->only(['hostname_status', 'ssl_status', 'origin_status'])
+            ->every(fn ($status) => $status === 'verified');
 
-        return $pending->count();
+        if ($verified || ! Cache::add("nudged:{$domain['id']}", true, 30)) {
+            return false;
+        }
+
+        rescue(fn () => $this->cloud->verifyDomain($domain['id']), report: false);
+
+        return true;
     }
 }
