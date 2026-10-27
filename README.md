@@ -2,7 +2,7 @@
 
 Gives Laravel Cloud preview environments custom subdomains, such as `admin`, `booking` and `portal`, without any changes to the app being previewed.
 
-Laravel Cloud's vanity domains don't support wildcards, so a preview only gets one hostname. This app fills that gap. When a preview is created, it adds a custom domain for each configured section through the [Laravel Cloud API](https://laravel.com/cloud/docs/api/introduction):
+Vanity domains generated on preview environments don't support wildcards due to limitations in TLS certificates are issued, so a preview only gets one hostname. This app fills that gap. When a preview is created, it adds a custom domain for each configured section through the [Laravel Cloud API](https://laravel.com/cloud/docs/api/introduction):
 
 ```
 {section}.{slug}.{ROUTER_ROOT_DOMAIN}
