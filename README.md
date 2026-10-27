@@ -113,7 +113,7 @@ Runs the same sync from the command line and prints each domain it adds.
 - **Hostnames use the slug, not the vanity URL.** A previewed app that builds subdomain URLs from its own `APP_URL` (the vanity URL) links to `{section}.{vanity}` names, which don't resolve. Fixing that needs a DNS record per preview, e.g. Cloud also creating `*.{vanity}` next to each vanity record.
 - **Slugs can collide across applications.** Two applications previewing the same branch name would ask for the same hostnames.
 - **Removing a section doesn't delete existing domains.** It only stops new ones being added.
-- **The router doesn't remove domains.** It assumes Cloud deletes a preview's custom domains along with the environment when the pull request closes. That hasn't been verified; check your domain count if it creeps up.
+- **The router doesn't remove domains, and doesn't need to.** Closing a pull request makes Cloud delete the preview environment along with its custom domains. In testing, the preview hostnames stopped serving their certificates within a few minutes of the PRs being closed.
 
 ## Local development
 
